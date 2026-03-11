@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>EOQ Pareto Executive Dashboard</title>
+ 
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+ 
+<style>
+ 
+body{
+font-family:Arial;
+background:#f4f6f8;
+margin:0;
+padding:0;
+}
+ 
+header{
+background:#1f2a44;
+color:white;
+padding:20px;
+}
+ 
+.container{
+padding:20px;
+}
+ 
+.card{
+background:white;
+padding:20px;
+margin-bottom:20px;
+border-radius:10px;
+box-shadow:0 3px 8px rgba(0,0,0,0.1);
+}
+ 
+.grid{
+display:grid;
+grid-template-columns:repeat(3,1fr);
+gap:15px;
+}
+ 
+input{
+width:100%;
+padding:10px;
+margin-top:5px;
+}
+ 
+button{
+margin-top:15px;
+padding:10px;
+background:#1f6feb;
+border:none;
+color:white;
+cursor:pointer;
+}
+ 
+table{
+width:100%;
+border-collapse:collapse;
+}
+ 
+th,td{
+padding:8px;
+border-bottom:1px solid #ddd;
+}
+ 
+.version{
+font-size:12px;
+opacity:0.7;
+}
+ 
+</style>
+</head>
+ 
+<body>
+ 
+<header>
+ 
+<h2>EOQ Pareto Executive Dashboard</h2>
+ 
+<div class="version" id="version"></div>
+ 
+</header>
+ 
+<div class="container">
+ 
+<div class="card">
+ 
+<h3>Paramètres EOQ</h3>
+ 
+<div class="grid">
+ 
+<div>
+Demande annuelle (D)
+<input id="demand" type="number" value="1000">
+</div>
+ 
+<div>
+Coût commande (S)
+<input id="orderCost" type="number" value="50">
+</div>
+ 
+<div>
+Coût possession (H)
+<input id="holdingCost" type="number" value="5">
+</div>
+ 
+</div>
+ 
+<button onclick="calculateEOQ()">Calculer EOQ</button>
+ 
+<h2 id="eoqResult"></h2>
+ 
+</div>
+ 
+<div class="card">
+ 
+<h3>Graphique EOQ</h3>
+ 
+<canvas id="eoqChart"></canvas>
+ 
+</div>
+ 
+<div class="card">
+ 
+<h3>Pareto Analyse</h3>
+ 
+<table id="paretoTable">
+ 
+<thead>
+ 
+<tr>
+<th>Article</th>
+<th>Valeur</th>
+<th>%</th>
+<th>% cumulatif</th>
+</tr>
+ 
+</thead>
+ 
+<tbody>
+ 
+<tr><td>A</td><td>500</td><td></td><td></td></tr>
+<tr><td>B</td><td>300</td><td></td><td></td></tr>
+<tr><td>C</td><td>100</td><td></td><td></td></tr>
+<tr><td>D</td><td>80</td><td></td><td></td></tr>
+<tr><td>E</td><td>20</td><td></td><td></td></tr>
+ 
+</tbody>
+ 
+</table>
+ 
+</div>
+ 
+<div class="card">
+ 
+<h3>Graphique Pareto</h3>
+ 
+<canvas id="paretoChart"></canvas>
+ 
+</div>
+ 
+</div>
+ 
+<script>
+ 
+function generateBuild(){
+ 
+let build = "Build " + new Date().getFullYear() + "." +
+(new Date().getMonth()+1) + "." +
+new Date().getDate() + "." +
+new Date().getHours() +
+new Date().getMinutes()
+ 
+document.getElementById("version").innerText = build
+ 
+}
+ 
+generateBuild()
+ 
+let eoqChart
+let paretoChart
+ 
+function calculateEOQ(){
+ 
+let D = Number(document.getElementById("demand").value)
+let S = Number(document.getElementById("orderCost").value)
+let H = Number(document.getElementById("holdingCost").value)
+ 
+let EOQ = Math.sqrt((2*D*S)/H)
+ 
+document.getElementById("eoqResult").innerText = "EOQ optimal : " + EOQ.toFixed(2)
+ 
+let quantities=[]
+let orderCosts=[]
+let holdingCosts=[]
+let totalCosts=[]
+ 
+for(let q=1;q<=EOQ*2;q++){
+ 
+let oc = (D/q)*S
+let hc = (q/2)*H
+let tc = oc+hc
+ 
+quantities.push(q)
+orderCosts.push(oc)
+holdingCosts.push(hc)
+totalCosts.push(tc)
+ 
+}
+ 
+if(eoqChart) eoqChart.destroy()
+ 
+eoqChart = new Chart(document.getElementById("eoqChart"),{
+ 
+type:"line",
+ 
+data:{
+labels:quantities,
+datasets:[
+{label:"Order Cost",data:orderCosts},
+{label:"Holding Cost",data:holdingCosts},
+{label:"Total Cost",data:totalCosts}
+]
+}
+ 
+})
+ 
+}
+ 
+function calculatePareto(){
+ 
+let rows = document.querySelectorAll("#paretoTable tbody tr")
+ 
+let values=[]
+let labels=[]
+ 
+rows.forEach(r=>{
+let val=Number(r.children[1].innerText)
+values.push(val)
+labels.push(r.children[0].innerText)
+})
+ 
+let total = values.reduce((a,b)=>a+b)
+ 
+let cumulative=0
+let cumData=[]
+ 
+rows.forEach((r,i)=>{
+ 
+let pct = values[i]/total*100
+cumulative+=pct
+ 
+r.children[2].innerText=pct.toFixed(1)+"%"
+r.children[3].innerText=cumulative.toFixed(1)+"%"
+ 
+cumData.push(cumulative)
+ 
+})
+ 
+if(paretoChart) paretoChart.destroy()
+ 
+paretoChart = new Chart(document.getElementById("paretoChart"),{
+ 
+data:{
+ 
+labels:labels,
+ 
+datasets:[
+ 
+{
+type:"bar",
+label:"Valeur",
+data:values
+},
+ 
+{
+type:"line",
+label:"% cumulatif",
+data:cumData
+}
+ 
+]
+ 
+}
+ 
+})
+ 
+}
+ 
+calculateEOQ()
+calculatePareto()
+ 
+</script>
+ 
+</body>
+</html>
